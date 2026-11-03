@@ -1,8 +1,8 @@
 {
   "web": 1,
   "web_files": {
-    "index.html": "https://gist.githubusercontent.com/<아이디>/<GIST_ID>/raw/index.html",
-    "app.js":     "https://gist.githubusercontent.com/<아이디>/<GIST_ID>/raw/app.js"
+    "index.html": "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/index.html",
+    "app.js":     "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/app.js"
   },
   "apk": 1,
   "apk_url": "",
