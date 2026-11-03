@@ -1,0 +1,15 @@
+{
+  "web": 1,
+  "web_files": {
+    "index.html": "https://gist.githubusercontent.com/<아이디>/<GIST_ID>/raw/index.html",
+    "app.js":     "https://gist.githubusercontent.com/<아이디>/<GIST_ID>/raw/app.js"
+  },
+  "apk": 1,
+  "apk_url": "",
+  "apk_note": "",
+  "pc": 1,
+  "pc_files": {
+    "yt_chat_finder_gui.py": "https://gist.githubusercontent.com/<아이디>/<GIST_ID>/raw/yt_chat_finder_gui.py"
+  },
+  "pc_note": ""
+}

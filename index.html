@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>유튜브 채팅 찾기</title>
+<style>
+  :root {
+    --bg: #15181c; --card: #1f2328; --line: #2e343c; --text: #d7dae0; --muted: #8b929c;
+    --accent: #e0574f; --accent2: #3a4a5e; --ok: #8fc79a; --found: #f2a07b; --foundbg: #2a2620;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; }
+  body { padding: 12px 12px 24px; }
+  header { display: flex; align-items: baseline; gap: 8px; margin: 2px 2px 10px; }
+  header h1 { font-size: 19px; margin: 0; }
+  header span { color: var(--muted); font-size: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .card label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .card label small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  textarea { width: 100%; min-height: 70px; resize: vertical; background: #15181c; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: inherit; font-size: 14px; line-height: 1.45; }
+  textarea:focus { outline: 2px solid var(--accent2); }
+  /* 줄마다 체크박스 목록 */
+  .list { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; margin-bottom: 6px; }
+  .list:empty::before { content: "아직 없음 — 아래 칸에 붙여넣고 [추가]"; color: var(--muted); font-size: 13px; padding: 6px 2px; }
+  .item { display: flex; align-items: center; gap: 6px; background: #15181c; border: 1px solid var(--line);
+    border-radius: 8px; padding: 4px 6px; }
+  .item.off { opacity: .45; }
+  .item input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+  .item input[type=text] { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--text);
+    font: inherit; font-size: 14px; padding: 6px 2px; }
+  .item input[type=text]:focus { outline: none; border-bottom: 1px solid var(--accent2); }
+  .item .del { flex: none; padding: 4px 9px; font-size: 13px; border-radius: 6px; background: transparent; color: var(--muted); }
+  .addrow { display: flex; gap: 6px; align-items: stretch; }
+  .addrow textarea { min-height: 44px; height: 44px; flex: 1; }
+  .addrow button { flex: none; }
+  .mini { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+  .mini button { font-size: 12px; padding: 6px 9px; }
+  .mini .cnt { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .locked .item input[type=text], .locked .del, .locked .addrow { pointer-events: none; opacity: .5; }
+  /* 줄 옵션 */
+  .item.t { flex-wrap: wrap; }
+  .item .gear { flex: none; padding: 4px 8px; font-size: 13px; border-radius: 6px; background: transparent; color: var(--muted); }
+  .item .sum { flex-basis: 100%; padding: 0 0 2px 30px; font-size: 12px; color: var(--muted); }
+  .item .sum b { color: var(--ok); font-weight: 600; }
+  .item .sum.lab { color: #8ab4f8; padding-bottom: 4px; }
+  .item.off .sum.lab { color: var(--muted); }
+  .item .opt { flex-basis: 100%; display: none; padding: 6px 4px 4px 30px; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; }
+  .item.open .opt { display: flex; }
+  .item .opt input[type=text] { flex: 1 1 100%; background: #1f2328; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  .item .opt select { background: #1f2328; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; font-size: 13px; }
+  .item .opt label { display: flex; align-items: center; gap: 4px; }
+  .item .opt input[type=checkbox] { width: 18px; height: 18px; }
+  .item .opt .idbtn { font-size: 12px; padding: 5px 8px; }
+  /* 탭 */
+  .tabs { display: flex; gap: 6px; margin: 4px 0 6px; }
+  .tabs button { flex: 1; font-size: 13px; padding: 8px 4px; }
+  .tabs button.on { background: var(--accent2); border-color: var(--accent2); color: #fff; font-weight: 700; }
+  .pane { display: none; } .pane.on { display: block; }
+  .board, .hist { background: #1f2328; border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+    height: 48vh; overflow-y: auto; font-size: 13px; }
+  .board .st, .hist .h { border-bottom: 1px solid var(--line); padding: 7px 6px; line-height: 1.5; }
+  .board .st:last-child, .hist .h:last-child { border-bottom: 0; }
+  .board .st .top { display: flex; justify-content: space-between; gap: 8px; }
+  .board .st .state { font-weight: 700; }
+  .board .live .state { color: var(--ok); } .board .wait .state { color: var(--muted); } .board .err .state { color: var(--accent); }
+  .board .st .sub, .hist .h .sub { color: var(--muted); font-size: 12px; word-break: break-all; }
+  .hist .h .who { color: var(--found); font-weight: 700; }
+  .fl { border-bottom: 1px solid var(--line); padding: 6px; }
+  .fl:last-child { border-bottom: 0; }
+  .fl.surge { background: #3a2522; border-radius: 8px; }
+  .fl .top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .fl .top b { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fl .top span { color: var(--muted); flex: none; }
+  .fl canvas { width: 100%; height: 40px; display: block; margin: 4px 0 2px; }
+  .fl .words { font-size: 12px; color: var(--muted); min-height: 16px; }
+  .fl .words.hot { color: var(--found); font-weight: 700; }
+  .hist .h .msg { color: var(--text); }
+  .histbar { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .histbar input { flex: 1; min-width: 0; background: #15181c; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; font: inherit; font-size: 13px; }
+  .histbar button { font-size: 12px; padding: 7px 9px; }
+  .presets { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 13px; }
+  .presets select { flex: 1; min-width: 0; background: #2a3037; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px; font: inherit; font-size: 13px; }
+  .presets button { font-size: 12px; padding: 8px 9px; }
+  #modal input { width: 100%; background: #15181c; color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; font: inherit; margin: -6px 0 14px; display: none; }
+  /* 확인 창 */
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 10; }
+  #modal.show { display: flex; }
+  #modal .box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: min(320px, 86vw); }
+  #modal p { margin: 0 0 16px; line-height: 1.5; }
+  #modal .btns { display: flex; gap: 8px; }
+  #modal .btns button { flex: 1; padding: 12px; font-weight: 700; }
+  .row { display: flex; gap: 8px; margin-bottom: 10px; }
+  button { font: inherit; color: var(--text); background: #2a3037; border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; }
+  button:active { filter: brightness(1.2); }
+  button:disabled { opacity: .4; }
+  .row button { flex: 1; font-weight: 700; font-size: 16px; padding: 13px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 10px; font-size: 14px; }
+  .opts label { display: flex; align-items: center; gap: 6px; }
+  .opts input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .tools button { font-size: 13px; padding: 8px 10px; }
+  .stats { color: var(--muted); font-size: 13px; margin: 0 2px 6px; display: flex; justify-content: space-between; }
+  #log { background: #1f2328; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px;
+    height: 48vh; overflow-y: auto; font-size: 14px; line-height: 1.55; word-break: break-all; }
+  #log div { padding: 1px 0; }
+  #log .status { color: var(--muted); }
+  #log .ok { color: var(--ok); }
+  #log .found { color: var(--found); font-weight: 700; background: var(--foundbg);
+    border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+  #log .found .msg { color: #f6d1bd; font-weight: 600; display: block; margin-top: 2px; }
+  #log .found .tap { color: var(--muted); font-weight: 400; font-size: 12px; display: block; margin-top: 2px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333a42; color: #fff;
+    padding: 10px 16px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none;
+    max-width: 90vw; text-align: center; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header><h1>유튜브 채팅 찾기</h1><span>by 멸콩마루</span></header>
+
+<section class="card">
+  <label>① 방송 주소 또는 채널 주소(@핸들)
+    <small>체크한 줄만 감시 · 채널을 넣으면 라이브가 켜질 때 자동 연결</small></label>
+  <div class="list" id="urlsList"></div>
+  <div class="addrow">
+    <textarea id="urlsAdd" spellcheck="false" autocapitalize="off" autocomplete="off"
+      placeholder="여기에 붙여넣기 (여러 줄 가능)"></textarea>
+    <button data-add="urls">추가</button>
+  </div>
+  <div class="mini"><button data-all="urls">전체 켜기</button><button data-none="urls">전체 끄기</button>
+    <button data-copy="urls">전체 복사</button><span class="cnt" id="urlsCnt"></span></div>
+</section>
+
+<section class="card">
+  <label>② 찾을 사용자 / 검색어
+    <small>체크한 줄만 찾음 · 감시 중에도 켜고 끌 수 있음 · 닉네임, 채널 ID, 채팅 내용에서 찾음</small></label>
+  <div class="list" id="targetsList"></div>
+  <div class="addrow">
+    <textarea id="targetsAdd" spellcheck="false" autocapitalize="off" autocomplete="off"
+      placeholder="여기에 붙여넣기 (여러 줄 가능)"></textarea>
+    <button data-add="targets">추가</button>
+  </div>
+  <div class="mini"><button data-all="targets">전체 켜기</button><button data-none="targets">전체 끄기</button>
+    <button data-copy="targets">전체 복사</button><span class="cnt" id="targetsCnt"></span></div>
+</section>
+
+<div class="row">
+  <button id="startBtn" class="primary">▶ 감시 시작</button>
+  <button id="stopBtn" disabled>■ 중지</button>
+</div>
+
+<div class="opts">
+  <label><input type="checkbox" id="optText" checked> 채팅 내용도 검색</label>
+  <label><input type="checkbox" id="optOpen" checked> 찾으면 방송 열기</label>
+  <label><input type="checkbox" id="optAuto"> 앱 열면 바로 시작</label>
+  <label><input type="checkbox" id="optAll"> 전체 채팅 보기</label>
+  <label style="grid-column: 1 / -1"><input type="checkbox" id="optOnce" checked> 같은 사람·같은 방은 처음 한 번만 알림</label>
+  <label style="grid-column: 1 / -1"><input type="checkbox" id="optSurge" checked> 채팅 급증 알림 (평소보다 갑자기 많아지면)</label>
+</div>
+
+<div class="presets">
+  <span>프리셋</span>
+  <select id="presetSel"><option value="">(저장된 프리셋 없음)</option></select>
+  <button id="presetLoad">불러오기</button>
+  <button id="presetSave">저장</button>
+  <button id="presetDel">삭제</button>
+</div>
+
+<div class="tools">
+  <button id="exportBtn">설정 내보내기</button>
+  <button id="importBtn">설정 불러오기</button>
+  <button id="csvBtn">결과 저장(CSV)</button>
+  <button id="clearBtn">입력 지우기</button>
+  <button id="batteryBtn">배터리 최적화 해제</button>
+  <button id="diagBtn">진단</button>
+  <button id="deviceBtn">기기번호</button>
+</div>
+
+<div class="stats"><span id="stats">찾은 채팅 0건 · 받은 채팅 0개</span><span id="state">대기</span></div>
+<div class="tabs">
+  <button data-tab="log" class="on">진행 상황</button>
+  <button data-tab="flow">채팅 흐름</button>
+  <button data-tab="board">방송 상태</button>
+  <button data-tab="hist">찾은 기록</button>
+</div>
+<div class="pane on" id="pane-log"><div id="log"></div></div>
+<div class="pane" id="pane-flow">
+  <div style="color:var(--muted);font-size:12px;margin:0 2px 6px">막대 1칸 = 5초 채팅 수(최근 5분) · 주황/빨강 = 평소보다 많음 · 🔥 = 급증 · 아래 = 최근 30초에 갑자기 많이 나온 말 · 누르면 방송 열기</div>
+  <div class="board" id="flow"></div>
+</div>
+<div class="pane" id="pane-board"><div class="board" id="board"></div></div>
+<div class="pane" id="pane-hist">
+  <div class="histbar"><input id="histQ" placeholder="기록 검색 (이름·내용·채널)">
+    <button id="histCsv">CSV</button><button id="histClear">지우기</button></div>
+  <div class="sub" id="histCnt" style="color:var(--muted);font-size:12px;margin:0 2px 4px"></div>
+  <div class="hist" id="hist"></div>
+</div>
+<div id="toast"></div>
+<div id="modal"><div class="box"><p id="modalText"></p><input id="modalInput" type="text">
+  <div class="btns"><button id="modalNo">아니요</button><button id="modalYes" class="primary">지우기</button></div></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>
