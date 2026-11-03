@@ -1250,7 +1250,7 @@ if (!A) write("※ 지금은 브라우저에서 열려 있어 유튜브에 접�
 // 아래 주소에 올린 JSON으로 누가 쓸 수 있는지 관리. (GitHub raw 또는 Gist raw 주소)
 //   {"enabled": true, "allowed": ["코드1","코드2"], "revoked": ["코드3"], "message": "..."}
 // 허용목록: allowed 에 있고 revoked 에 없는 코드만 사용 가능. 막으려면 그 코드를 revoked 에 추가.
-const LICENSE_URL = "https://raw.githubusercontent.com/<아이디>/<저장소>/main/license.json";
+const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/license.json";
 const LICENSE_GRACE_DAYS = 3, LICENSE_RECHECK_MS = 3600 * 1000;
 const LICENSE_MSG = "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
 function licenseOff() { return !A || LICENSE_URL.includes("<아이디>") || LICENSE_URL.includes("<저장소>"); }
