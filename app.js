@@ -12,6 +12,7 @@ const CHECK_SEC = 60;          // 채널 라이브 확인 간격
 const RETRY_SEC = 15;          // 오류 시 재시도 간격
 const LIVE_RANGE = "bytes=0-524287"; // 라이브 확인은 앞부분(약 512KB)만 받아 데이터 절약(방송 많아도 안 멈춤)
 const STAGGER_MS = 400;        // 방송이 많을 때 한꺼번에 요청하지 않도록 채널마다 시차
+const JS_VER = "2026-11-07-range"; // 화면(app.js) 버전 — 진단에 찍혀서 어떤 app.js가 로딩됐는지 확인용
 const MAX_LOG = 1500;
 const API = "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?prettyPrint=false";
 const A = window.Android || null;
@@ -892,6 +893,7 @@ async function diagnose() {
   write("🩺 진단 시작…", "ok");
   try { const d = A && A.diagInfo ? JSON.parse(A.diagInfo()) : {};
     add("기기", `${d.model || "?"} / Android ${d.android || "?"} / 앱 ${d.app || "?"}`);
+    add("화면(JS) 버전", JS_VER + " ← 이게 안 보이면 옛날 app.js가 로딩된 것");
     add("배터리 제한 없음", d.batteryUnrestricted ? "예" : "아니요 ← [배터리 최적화 해제] 필요");
     add("알림 허용", d.notifications ? "예" : "아니요 ← 설정에서 알림 허용 필요");
   } catch (e) { add("기기 정보", "읽기 실패 " + e.message); }
@@ -1285,7 +1287,7 @@ async function loadNotice() {
 // 아래 주소에 올린 JSON으로 누가 쓸 수 있는지 관리. (GitHub raw 또는 Gist raw 주소)
 //   {"enabled": true, "allowed": ["코드1","코드2"], "revoked": ["코드3"], "message": "..."}
 // 허용목록: allowed 에 있고 revoked 에 없는 코드만 사용 가능. 막으려면 그 코드를 revoked 에 추가.
-const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/license.json";
+const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/license.json";
 // 공지/제목용. notice.json 의 raw 주소. (켤 때마다 읽어서 제목·공지를 최신으로 바꿈)
 const NOTICE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/notice.json";
 const LICENSE_GRACE_DAYS = 3, LICENSE_RECHECK_MS = 3600 * 1000;
