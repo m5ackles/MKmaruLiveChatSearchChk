@@ -1287,7 +1287,7 @@ async function loadNotice() {
 // 아래 주소에 올린 JSON으로 누가 쓸 수 있는지 관리. (GitHub raw 또는 Gist raw 주소)
 //   {"enabled": true, "allowed": ["코드1","코드2"], "revoked": ["코드3"], "message": "..."}
 // 허용목록: allowed 에 있고 revoked 에 없는 코드만 사용 가능. 막으려면 그 코드를 revoked 에 추가.
-const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/license.json";
+const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/license.json";
 // 공지/제목용. notice.json 의 raw 주소. (켤 때마다 읽어서 제목·공지를 최신으로 바꿈)
 const NOTICE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/notice.json";
 const LICENSE_GRACE_DAYS = 3, LICENSE_RECHECK_MS = 3600 * 1000;
