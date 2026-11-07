@@ -1,5 +1,5 @@
 {
-  "web": 1,
+  "web": 2,
   "web_files": {
     "index.html": "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/index.html",
     "app.js":     "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/app.js"
