@@ -1264,16 +1264,30 @@ if (!A) write("※ 지금은 브라우저에서 열려 있어 유튜브에 접�
 /* ---------------- 공지·제목 (켤 때마다 최신) ---------------- */
 async function loadNotice() {
   if (!A || NOTICE_URL.includes("<아이디>") || NOTICE_URL.includes("<저장소>")) return;
-  let d;
+  let d = {};
   try {
     const r = await http("GET", NOTICE_URL + "?_=" + Date.now(), { "Cache-Control": "no-cache" });
-    if (r.status >= 400) return;
-    d = JSON.parse(r.text);
-  } catch (e) { return; }   // 실패하면 기본값 유지
+    if (r.status < 400) d = JSON.parse(r.text);
+  } catch (e) { /* 공지 못 읽으면 기본값 유지 */ }
+  // 제목 버전 숫자: notice.json 에 ver 가 있으면 그걸, 없으면 version.json 의 web 을 그대로 사용
+  // → 버전 숫자를 따로 입력할 필요 없이 version.json 의 web 하나만 올리면 제목도 같이 바뀜
+  let ver = (d.ver != null) ? d.ver : null;
+  if (ver == null) {
+    try {
+      const vurl = NOTICE_URL.replace(/notice\.json$/, "version.json");
+      const r = await http("GET", vurl + "?_=" + Date.now(), { "Cache-Control": "no-cache" });
+      if (r.status < 400) { const vj = JSON.parse(r.text); if (vj.web != null) ver = vj.web; }
+    } catch (e) { /* version.json 못 읽으면 버전 표시 생략 */ }
+  }
   try {
     const h1 = document.querySelector("header h1");
     const sub = document.querySelector("header span");
-    if (h1 && d.title) h1.textContent = d.title;
+    if (h1) {
+      // 제목 본문(버전 꼬리표 제외). notice.json 에 title 있으면 그걸 본문으로.
+      let base = (d.title != null ? String(d.title) : (h1.textContent || "유튜브 채팅 찾기")).trim();
+      base = base.replace(/\s*\(?v\d+\)?\s*$/i, "").trim();   // 기존 vNN / (vNN) 꼬리표 제거
+      h1.textContent = (ver != null) ? `${base} (v${ver})` : base;
+    }
     if (sub && d.subtitle != null) sub.textContent = d.subtitle;
     const nb = document.getElementById("noticeBar") || document.getElementById("testTag");
     if (nb && d.notice != null) {
@@ -1287,9 +1301,9 @@ async function loadNotice() {
 // 아래 주소에 올린 JSON으로 누가 쓸 수 있는지 관리. (GitHub raw 또는 Gist raw 주소)
 //   {"enabled": true, "allowed": ["코드1","코드2"], "revoked": ["코드3"], "message": "..."}
 // 허용목록: allowed 에 있고 revoked 에 없는 코드만 사용 가능. 막으려면 그 코드를 revoked 에 추가.
-const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/license.json";
+const LICENSE_URL = "https://raw.githubusercontent.com/<아이디>/<저장소>/main/license.json";
 // 공지/제목용. notice.json 의 raw 주소. (켤 때마다 읽어서 제목·공지를 최신으로 바꿈)
-const NOTICE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/notice.json";
+const NOTICE_URL = "https://raw.githubusercontent.com/<아이디>/<저장소>/main/notice.json";
 const LICENSE_GRACE_DAYS = 3, LICENSE_RECHECK_MS = 3600 * 1000;
 const LICENSE_MSG = "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
 function licenseOff() { return !A || LICENSE_URL.includes("<아이디>") || LICENSE_URL.includes("<저장소>"); }
