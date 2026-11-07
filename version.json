@@ -1,13 +1,13 @@
 {
-  "web": 44,
+  "web": 46,
   "web_files": {
     "index.html": "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/index.html",
     "app.js":     "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/app.js"
   },
-  "apk": 44,
-  "apk_url": "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/ytchatsearch-v44.apk",
+  "apk": 46,
+  "apk_url": "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/ytchatsearch-v46.apk",
   "apk_note": "",
-  "pc": 44,
+  "pc": 46,
   "pc_files": {
     "yt_chat_finder_gui.py": "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/raw/yt_chat_finder_gui.py"
   },
