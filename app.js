@@ -10,6 +10,8 @@ const UA = {
 };
 const CHECK_SEC = 60;          // 채널 라이브 확인 간격
 const RETRY_SEC = 15;          // 오류 시 재시도 간격
+const LIVE_RANGE = "bytes=0-524287"; // 라이브 확인은 앞부분(약 512KB)만 받아 데이터 절약(방송 많아도 안 멈춤)
+const STAGGER_MS = 400;        // 방송이 많을 때 한꺼번에 요청하지 않도록 채널마다 시차
 const MAX_LOG = 1500;
 const API = "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?prettyPrint=false";
 const A = window.Android || null;
@@ -39,8 +41,8 @@ function http(method, url, headers, body) {
   });
 }
 
-async function getText(url) {
-  const r = await http("GET", url, UA);
+async function getText(url, extra) {
+  const r = await http("GET", url, extra ? Object.assign({}, UA, extra) : UA);
   if (r.status >= 400) throw new Error("HTTP " + r.status);
   return r.text;
 }
@@ -50,6 +52,8 @@ async function getText(url) {
 const P = {
   CANON: '<link rel="canonical" href="https://www\\.youtube\\.com/watch\\?v=([\\w-]{11})"',
   LIVE: '"isLiveNow":true',
+  UPCOMING: '"isUpcoming":true',
+  HLS: 'hlsManifestUrl',
   TITLE: '"videoDetails":\\{[\\s\\S]*?"title":"((?:[^"\\\\]|\\\\.)*)"',
   AUTHOR: '"videoDetails":\\{[\\s\\S]*?"author":"((?:[^"\\\\]|\\\\.)*)"',
   VCHID: '"videoDetails":\\{[\\s\\S]*?"channelId":"(UC[\\w-]{22})"',
@@ -71,20 +75,21 @@ function extractLocal(text, pats) {   // 예전 앱(추출 기능 없음)용 대
     return m ? (m.length > 1 ? m[1] : m[0]) : null;
   });
 }
-async function getParts(url, pats) {
+async function getParts(url, pats, extra) {
   if (A && A.requestX) {
+    const hdrs = extra ? Object.assign({}, UA, extra) : UA;
     const r = await new Promise((res, rej) => {
       const id = ++reqSeq;
       const timer = setTimeout(() => { if (pending[id]) { delete pending[id]; rej(new Error("응답 시간 초과")); } }, 40000);
       pending[id] = { res, rej, timer };
-      A.requestX(id, "GET", url, JSON.stringify(UA), "", JSON.stringify(pats));
+      A.requestX(id, "GET", url, JSON.stringify(hdrs), "", JSON.stringify(pats));
     });
     if (r.status >= 400) throw new Error("HTTP " + r.status);
     const o = JSON.parse(r.text);
     lastPageLen = o.len;
     return o.m;
   }
-  const text = await getText(url);
+  const text = await getText(url, extra);
   lastPageLen = text.length;
   return extractLocal(text, pats);
 }
@@ -231,8 +236,12 @@ function jstr(html, re) {
 }
 
 async function findLive(base) {
-  const [vid, live] = await getParts(safeUrl(base + "/live"), [P.CANON, P.LIVE]);
-  return vid && live ? vid : null;
+  // /live 페이지가 영상(watch?v=)으로 연결되면 라이브(또는 예정)로 본다.
+  // '예정만'(아직 시작 안 함)인 경우만 제외. isLiveNow 표시에만 의존하지 않음.
+  const [vid, live, upcoming] = await getParts(safeUrl(base + "/live"), [P.CANON, P.LIVE, P.UPCOMING], { "Range": LIVE_RANGE });
+  if (!vid) return null;
+  if (upcoming && !live) return null;
+  return vid;
 }
 
 async function videoInfo(url) {
@@ -394,6 +403,8 @@ async function roomWorker(sess, idx, url) {
 async function channelWatcher(sess, idx, src, shown) {
   const base = channelBase(src);
   status(sess, idx, `#${idx} 채널 대기 중: ${shown || src} (라이브가 켜지면 자동 연결)`);
+  if (idx > 1) await wait(sess, Math.min(idx - 1, 20) * STAGGER_MS); // 방송 많을 때 동시 요청 분산
+  if (sess.stopped) return;
   let lastErr = null;
   while (!sess.stopped) {
     let vid = null;
@@ -897,9 +908,11 @@ async function diagnose() {
     const u = it.text.trim();
     try {
       if (isChannel(u)) {
-        const vid = await findLive(channelBase(it.cid || u));
-        add(`라이브 확인 ${u}`, vid ? `라이브 중 (${vid})` : `라이브 아님 (페이지 ${lastPageLen}자)`);
-        if (vid) await diagChat(vid, add);
+        const base = channelBase(it.cid || u);
+        const [cv, lv, up, hls] = await getParts(safeUrl(base + "/live"), [P.CANON, P.LIVE, P.UPCOMING, P.HLS]);
+        add(`라이브 확인 ${u}`, `watch=${cv || "없음"} isLiveNow=${lv ? "O" : "X"} 예정=${up ? "O" : "X"} HLS=${hls ? "O" : "X"} (페이지 ${lastPageLen}자)`);
+        const vid = (cv && !(up && !lv)) ? cv : null;
+        if (vid) await diagChat(vid, add); else add(`  판정 ${u}`, "라이브 아님으로 처리");
       } else {
         const vid = videoId(u);
         add(`방송 주소 ${u}`, vid ? `영상 ID ${vid}` : "영상 ID를 못 찾음");
@@ -1246,11 +1259,35 @@ write("주소와 찾을 사용자/검색어를 입력하고 [▶ 감시 시작]�
 write("채널 주소(예: @채널핸들)를 넣으면 라이브가 켜질 때 자동으로 연결합니다.", "status");
 write("화면을 꺼도 감시가 계속되도록 [배터리 최적화 해제]를 한 번 눌러 주세요.", "status");
 if (!A) write("※ 지금은 브라우저에서 열려 있어 유튜브에 접속할 수 없습니다. 앱으로 설치해서 사용하세요.", "status");
+/* ---------------- 공지·제목 (켤 때마다 최신) ---------------- */
+async function loadNotice() {
+  if (!A || NOTICE_URL.includes("<아이디>") || NOTICE_URL.includes("<저장소>")) return;
+  let d;
+  try {
+    const r = await http("GET", NOTICE_URL + "?_=" + Date.now(), { "Cache-Control": "no-cache" });
+    if (r.status >= 400) return;
+    d = JSON.parse(r.text);
+  } catch (e) { return; }   // 실패하면 기본값 유지
+  try {
+    const h1 = document.querySelector("header h1");
+    const sub = document.querySelector("header span");
+    if (h1 && d.title) h1.textContent = d.title;
+    if (sub && d.subtitle != null) sub.textContent = d.subtitle;
+    const nb = document.getElementById("noticeBar") || document.getElementById("testTag");
+    if (nb && d.notice != null) {
+      nb.textContent = d.notice;
+      nb.style.display = d.notice ? "" : "none";
+    }
+  } catch (e) { /* 무시 */ }
+}
+
 /* ---------------- 원격 사용 관리 ---------------- */
 // 아래 주소에 올린 JSON으로 누가 쓸 수 있는지 관리. (GitHub raw 또는 Gist raw 주소)
 //   {"enabled": true, "allowed": ["코드1","코드2"], "revoked": ["코드3"], "message": "..."}
 // 허용목록: allowed 에 있고 revoked 에 없는 코드만 사용 가능. 막으려면 그 코드를 revoked 에 추가.
 const LICENSE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/license.json";
+// 공지/제목용. notice.json 의 raw 주소. (켤 때마다 읽어서 제목·공지를 최신으로 바꿈)
+const NOTICE_URL = "https://raw.githubusercontent.com/m5ackles/MKmaruLiveChatSearchChk/refs/heads/main/notice.json";
 const LICENSE_GRACE_DAYS = 3, LICENSE_RECHECK_MS = 3600 * 1000;
 const LICENSE_MSG = "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
 function licenseOff() { return !A || LICENSE_URL.includes("<아이디>") || LICENSE_URL.includes("<저장소>"); }
@@ -1283,6 +1320,7 @@ function applyLicense(res) {
   const now = Date.now();
   if (res.state === "ok") {
     lic.state = "ok"; lic.okAt = now; licensed = true; licSave();
+    hideLock();
     $("startBtn").disabled = !!(S && !S.stopped);
     return;
   }
@@ -1295,11 +1333,43 @@ function applyLicense(res) {
   else if (lic.okAt && now - lic.okAt <= LICENSE_GRACE_DAYS * 86400000) { licensed = true; }
   else { licensed = false; licenseBlock(LICENSE_MSG); }
 }
+/* 화면 전체를 덮어 아무것도 못 누르게 하는 잠금 화면 */
+function showLock(innerHtml) {
+  let el = document.getElementById("lockScreen");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "lockScreen";
+    el.style.cssText = "position:fixed;inset:0;z-index:999999;background:#15181c;color:#d7dae0;"
+      + "display:flex;flex-direction:column;align-items:center;justify-content:center;"
+      + "text-align:center;padding:28px;gap:16px;font-size:16px;line-height:1.6;"
+      + "font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = innerHtml;
+  el.style.display = "flex";
+}
+function hideLock() {
+  const el = document.getElementById("lockScreen");
+  if (el) el.style.display = "none";
+}
 function licenseBlock(msg) {
   if (S && !S.stopped) stop();
   $("startBtn").disabled = true;
-  if (!lic.okAt) showDeviceNumber();   // 아직 승인 안 된 기기 → 번호 안내
-  else { write(`⛔ ${msg}`, "status"); toast(msg); }   // 이미 쓰던 사람 → 그대로 메시지만
+  if (!lic.okAt) {
+    // 아직 승인 안 된 기기 → 전체 화면으로 기기번호 안내
+    showLock(
+      '<div style="font-size:21px;font-weight:700">사용 승인이 필요합니다</div>'
+      + '<div>아래 기기번호를 관리자(멸콩마루)에게 보내<br>사용 승인을 받으세요.</div>'
+      + '<div style="font-size:23px;font-weight:700;color:#f2a07b;letter-spacing:1px">' + lic.code + '</div>'
+      + '<button id="lockCopy" style="font:inherit;font-size:16px;font-weight:700;color:#fff;'
+      + 'background:#e0574f;border:0;border-radius:12px;padding:13px 22px">기기번호 복사</button>'
+      + '<div style="font-size:13px;color:#8b929c">승인 후 앱을 다시 켜면 됩니다.</div>');
+    const c = document.getElementById("lockCopy");
+    if (c) c.onclick = () => copyText(lic.code);
+  } else {
+    // 이미 쓰던 기기 → 전체 화면으로 메시지만 (일부러 막았다는 티 없이)
+    showLock('<div style="font-size:19px;font-weight:600;max-width:320px">' + msg + '</div>');
+  }
 }
 function genDeviceId() {
   if (A && A.deviceId) { const d = A.deviceId(); if (d) return d; }
@@ -1339,4 +1409,5 @@ loadHistory();
 renderHistory();
 const loaded = load();
 licenseStartup();
+loadNotice();  // 공지·제목을 켤 때마다 최신으로 (web 숫자 안 올려도 바뀜)
 if (loaded && loaded.auto_start && licensed !== false) setTimeout(start, 600);
